@@ -1,6 +1,9 @@
 # Mol2vec
 [Mol2vec](http://pubs.acs.org/doi/10.1021/acs.jcim.7b00616) - an unsupervised machine learning approach to learn vector representations of molecular substructures
 
+This is a fork of the original Mol2vec repository by [@samoturk](https://github.com/samoturk/mol2vec), with modifications by @laserkelvin.
+These are mostly performance and flexibility adjustments, for example passing kwargs.
+
 [![Documentation Status](https://readthedocs.org/projects/mol2vec/badge/?version=latest)](http://mol2vec.readthedocs.org/en/latest/)
 
 ## Requirements

@@ -168,25 +168,27 @@ def mol2alt_sentence(mol, radius):
     return list(alternating_sentence)
 
 
-def _parallel_job(mol, r):
+def _parallel_job(mol, r, sanitize=False):
     """Helper function for joblib jobs
     """
     if mol is not None:
         smiles = Chem.MolToSmiles(mol)
-        mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
+        mol.UpdatePropertyCache(strict=False)
+        Chem.GetSymmSSSR(mol)
         sentence = mol2alt_sentence(mol, r)
         return " ".join(sentence)
 
 
-def _read_smi(file_name):
+def _read_smi(file_name, sanitize=False):
     while True:
         line = file_name.readline()
         if not line:
             break
-        yield Chem.MolFromSmiles(line.split('\t')[0])
+        yield Chem.MolFromSmiles(line.split('\t')[0], sanitize=sanitize)
 
 
-def generate_corpus(in_file, out_file, r, sentence_type='alt', n_jobs=1):
+def generate_corpus(in_file, out_file, r, sentence_type='alt', n_jobs=1, sanitize=False):
 
     """Generates corpus file from sdf
     
@@ -204,9 +206,9 @@ def generate_corpus(in_file, out_file, r, sentence_type='alt', n_jobs=1):
                     'individual' - generates corpus files for each radius
     n_jobs : int
         Number of cores to use (only 'alt' sentence type is parallelized)
-
-    Returns
-    -------
+    sanitize : bool, optional
+        Flag to perform sanitization of SMILES; if True, RDKit will
+        reject SMILES that violate standard valency rules.
     """
 
     # File type detection
@@ -240,25 +242,26 @@ def generate_corpus(in_file, out_file, r, sentence_type='alt', n_jobs=1):
             suppl = Chem.ForwardSDMolSupplier(mols_file)
         else:
             mols_file = gzip.open(in_file, mode='rt')
-            suppl = _read_smi(mols_file)
+            suppl = _read_smi(mols_file, sanitize)
     else:
         if in_split[-1].lower() == 'sdf':
             suppl = Chem.ForwardSDMolSupplier(in_file)
         else:
             mols_file = open(in_file, mode='rt')
-            suppl = _read_smi(mols_file)
+            suppl = _read_smi(mols_file, sanitize)
 
     if sentence_type == 'alt':  # This can run parallelized
-        result = Parallel(n_jobs=n_jobs, verbose=1)(delayed(_parallel_job)(mol, r) for mol in suppl)
+        result = Parallel(n_jobs=n_jobs, verbose=1)(delayed(_parallel_job)(mol, r, sanitize) for mol in suppl)
         for i, line in enumerate(result):
             f3.write(str(line) + '\n')
-        print('% molecules successfully processed.')
+        print(f'{i + 1} molecules successfully processed.')
 
     else:
         for mol in suppl:
             if mol is not None:
                 smiles = Chem.MolToSmiles(mol)
-                mol = Chem.MolFromSmiles(smiles)
+                mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
+                mol.UpdatePropertyCache()
                 identifier_sentences, alternating_sentence = mol2sentence(mol, r)
 
                 identifier_sentence_r0 = " ".join(identifier_sentences[0])
